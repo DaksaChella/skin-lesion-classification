@@ -21,6 +21,8 @@ def build_s1_from_scratch():
     return model
 
 
+
+
 def build_s2_full_freeze():
     # S2 — pretrained weights, only last layer trained
     model = models.efficientnet_b0(weights='IMAGENET1K_V1')
@@ -57,6 +59,7 @@ def build_s3_gradual_unfreeze():
         model.classifier[1].in_features,
         7
     )
+
 
     print("S3 - Gradual Unfreeze: starts frozen, blocks unfrozen during training")
     return model
@@ -99,6 +102,8 @@ def test_with_dummy_data():
     output = model_s1(dummy_images)
     print("Output shape:", output.shape)
 
+
+
     print()
     print("=" * 50)
     print("TEST S2 — Full Freeze")
@@ -107,6 +112,8 @@ def test_with_dummy_data():
     count_trainable_params(model_s2)
     output = model_s2(dummy_images)
     print("Output shape:", output.shape)
+
+
 
     print()
     print("=" * 50)
@@ -118,7 +125,7 @@ def test_with_dummy_data():
     print("Output shape:", output.shape)
 
     print()
-    print("✅ All 3 models work!")
+    print(" All 3 models work!")
 
 
 
