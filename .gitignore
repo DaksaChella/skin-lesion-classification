@@ -1,2 +1,25 @@
+# Dataset
+data/*.csv
+data/*.jpg
+data/*.png
+data/HAM10000*/
+
+# Model Checkpoints
+*.pth
+*.pt
+*.h5
+*.ckpt
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Environments
+.env
+venv/
+.venv/
+
+# Mac spezifisch
 .DS_Store
 HAM10000/
