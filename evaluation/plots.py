@@ -6,7 +6,7 @@ import os
 
 
 
-os.makedirs('figures', exist_ok=True)
+os.makedirs('results', exist_ok=True)
 
 
 
@@ -47,9 +47,9 @@ def plot_training_curves(history, strategy_name):
     ax2.grid(True)
 
     plt.tight_layout()
-    plt.savefig(f'figures/{strategy_name}_training_curves.png')
+    plt.savefig(f'results/{strategy_name}_training_curves.png')
     plt.show()
-    print(f"Training curves saved to figures/{strategy_name}_training_curves.png")
+    print(f"Training curves saved to results/{strategy_name}_training_curves.png")
 
 
 
@@ -105,9 +105,9 @@ def plot_strategy_comparison(results):
         )
 
     plt.tight_layout()
-    plt.savefig('figures/strategy_comparison.png')
+    plt.savefig('results/strategy_comparison.png')
     plt.show()
-    print("Strategy comparison saved to figures/strategy_comparison.png")
+    print("Strategy comparison saved to results/strategy_comparison.png")
 
 
 

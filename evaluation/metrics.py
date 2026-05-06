@@ -83,9 +83,9 @@ def plot_confusion_matrix(y_true, y_pred, strategy_name):
     plt.ylabel('True Label')
     plt.xlabel('Predicted Label')
     plt.tight_layout()
-    plt.savefig(f'figures/{strategy_name}_confusion_matrix.png')
+    plt.savefig(f'results/{strategy_name}_confusion_matrix.png')
     plt.show()
-    print(f"Confusion matrix saved to figures/{strategy_name}_confusion_matrix.png")
+    print(f"Confusion matrix saved to results/{strategy_name}_confusion_matrix.png")
 
 
 

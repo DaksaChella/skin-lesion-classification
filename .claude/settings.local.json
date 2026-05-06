@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(C:/Users/crist/anaconda3/envs/skin-lesion/python.exe -c ' *)"
+    ]
+  }
+}
