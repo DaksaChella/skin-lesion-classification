@@ -194,7 +194,8 @@ def run_strategy(strategy_name, num_epochs=5, batch_size=32, unfreeze_every=1):
     plot_training_curves(history, strategy_name)
 
     os.makedirs("results", exist_ok=True)
+    payload = {**metrics, "history": history}
     with open(f"results/{strategy_name}_metrics.json", "w") as f:
-        json.dump(metrics, f, indent=4)
+        json.dump(payload, f, indent=4)
 
     return {"model": model, "history": history, "metrics": metrics}

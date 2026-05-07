@@ -55,27 +55,31 @@ def plot_training_curves(history, strategy_name):
 
 def plot_strategy_comparison(results):
     """
-    Plots a bar chart comparing Balanced Accuracy and AUC for all strategies.
+    Plots a bar chart comparing Balanced Accuracy, Macro F1 and Macro AUC
+    for all strategies.
 
     Args:
         results: dictionary like:
                  {
-                   'S1': {'balanced_accuracy': 0.45, 'macro_auc': 0.70},
-                   'S2': {'balanced_accuracy': 0.60, 'macro_auc': 0.80},
-                   'S3': {'balanced_accuracy': 0.75, 'macro_auc': 0.88}
+                   'S1': {'balanced_accuracy': 0.45, 'macro_f1': 0.40, 'macro_auc': 0.70},
+                   ...
                  }
     """
     strategies = list(results.keys())
     bal_accs = [results[s]['balanced_accuracy'] for s in strategies]
+    f1s = [results[s].get('macro_f1', 0.0) for s in strategies]
     aucs = [results[s]['macro_auc'] for s in strategies]
 
     x = np.arange(len(strategies))
-    width = 0.35
+    width = 0.27
 
-    fig, ax = plt.subplots(figsize=(8, 5))
+    fig, ax = plt.subplots(figsize=(9, 5))
 
-    bars1 = ax.bar(x - width/2, bal_accs, width, label='Balanced Accuracy')
-    bars2 = ax.bar(x + width/2, aucs, width, label='Macro AUC')
+    bar_groups = [
+        ax.bar(x - width, bal_accs, width, label='Balanced Accuracy'),
+        ax.bar(x,         f1s,      width, label='Macro F1'),
+        ax.bar(x + width, aucs,     width, label='Macro AUC'),
+    ]
 
     ax.set_title('Strategy Comparison — S1 vs S2 vs S3')
     ax.set_xlabel('Strategy')
@@ -86,23 +90,14 @@ def plot_strategy_comparison(results):
     ax.legend()
     ax.grid(True, axis='y')
 
-
-
-    # Add value labels on top of bars
-    for bar in bars1:
-        ax.text(
-            bar.get_x() + bar.get_width() / 2,
-            bar.get_height() + 0.01,
-            f'{bar.get_height():.2f}',
-            ha='center', va='bottom', fontsize=10
-        )
-    for bar in bars2:
-        ax.text(
-            bar.get_x() + bar.get_width() / 2,
-            bar.get_height() + 0.01,
-            f'{bar.get_height():.2f}',
-            ha='center', va='bottom', fontsize=10
-        )
+    for bars in bar_groups:
+        for bar in bars:
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height() + 0.01,
+                f'{bar.get_height():.2f}',
+                ha='center', va='bottom', fontsize=9
+            )
 
     plt.tight_layout()
     plt.savefig('results/strategy_comparison.png')

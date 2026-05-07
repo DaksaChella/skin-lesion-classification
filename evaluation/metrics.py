@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn.metrics import (
     balanced_accuracy_score,
+    f1_score,
     roc_auc_score,
     confusion_matrix,
     classification_report
@@ -31,10 +32,21 @@ def compute_metrics(y_true, y_pred, y_prob):
     """
     bal_acc = balanced_accuracy_score(y_true, y_pred)
     auc = roc_auc_score(y_true, y_prob, multi_class='ovr', average='macro')
+    macro_f1 = f1_score(y_true, y_pred, average='macro', zero_division=0)
+    per_class_f1 = f1_score(
+        y_true, y_pred, average=None, labels=list(range(len(CLASS_NAMES))), zero_division=0
+    )
+    cm = confusion_matrix(y_true, y_pred, labels=list(range(len(CLASS_NAMES))))
 
     metrics = {
         'balanced_accuracy': round(bal_acc, 4),
+        'macro_f1': round(macro_f1, 4),
         'macro_auc': round(auc, 4),
+        'per_class_f1': {
+            cls: round(float(score), 4)
+            for cls, score in zip(CLASS_NAMES, per_class_f1)
+        },
+        'confusion_matrix': cm.tolist(),
     }
 
     return metrics
@@ -53,7 +65,12 @@ def print_metrics(metrics, strategy_name):
     print(f"\nResults for {strategy_name}:")
     print("=" * 40)
     print(f"Balanced Accuracy : {metrics['balanced_accuracy']}")
+    print(f"Macro F1          : {metrics['macro_f1']}")
     print(f"Macro AUC         : {metrics['macro_auc']}")
+    if 'per_class_f1' in metrics:
+        print("Per-class F1:")
+        for cls, score in metrics['per_class_f1'].items():
+            print(f"  {cls:<6}: {score}")
     print("=" * 40)
 
 
