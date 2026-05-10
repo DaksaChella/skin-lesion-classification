@@ -9,13 +9,12 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from torchvision.models import ResNet18_Weights
 import torchvision.models as models
-from sklearn.metrics import balanced_accuracy_score, roc_auc_score, confusion_matrix
+from sklearn.metrics import balanced_accuracy_score, roc_auc_score, confusion_matrix, f1_score
 import matplotlib.pyplot as plt
 import seaborn as sns
 
 sys.path.insert(0, '.')
 from models.model import build_s3_gradual_unfreeze
-
 
 # Device
 if torch.backends.mps.is_available():
@@ -24,14 +23,15 @@ else:
     device = torch.device("cpu")
 print("Using device:", device)
 
+
+
+
+
 # Data
 DATA_PATH = "/Users/daksahainichellappah/Desktop/Semester/Deepl Learning/DL_Project/dataset_Skin Cancer MNIST_HAM10000"
 
 val_df = pd.read_csv('preprocessed_output/val_split.csv')
 val_df['path'] = DATA_PATH + '/' + val_df['path'].str.replace('HAM10000/', '', regex=False)
-
-
-
 
 class SkinDataset(Dataset):
     def __init__(self, df, transform=None):
@@ -54,9 +54,11 @@ val_transforms = transforms.Compose([
 
 val_loader = DataLoader(SkinDataset(val_df, val_transforms), batch_size=32, shuffle=False)
 
+
 CLASS_NAMES = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
-# Evaluation functions
+
+
 def evaluate_model(model, loader, strategy_name):
     model.eval()
     all_preds, all_labels, all_probs = [], [], []
@@ -72,14 +74,17 @@ def evaluate_model(model, loader, strategy_name):
     all_preds  = np.array(all_preds)
     all_labels = np.array(all_labels)
     all_probs  = np.array(all_probs)
-    bal_acc = balanced_accuracy_score(all_labels, all_preds)
-    auc     = roc_auc_score(all_labels, all_probs, multi_class='ovr', average='macro')
+    bal_acc  = balanced_accuracy_score(all_labels, all_preds)
+    auc      = roc_auc_score(all_labels, all_probs, multi_class='ovr', average='macro')
+    macro_f1 = f1_score(all_labels, all_preds, average='macro')
     print(f"\nResults for {strategy_name}:")
     print("=" * 40)
     print(f"Balanced Accuracy : {round(bal_acc, 4)}")
     print(f"Macro AUC         : {round(auc, 4)}")
+    print(f"Macro F1          : {round(macro_f1, 4)}")
     print("=" * 40)
-    return bal_acc, auc
+    return bal_acc, auc, macro_f1
+
 
 
 def save_confusion_matrix(model, loader, strategy_name):
@@ -107,6 +112,7 @@ def save_confusion_matrix(model, loader, strategy_name):
     print(f"Saved: figures/{strategy_name}_confusion_matrix.png")
 
 
+
 def save_training_curves(history, strategy_name):
     epochs = range(1, len(history['train_loss']) + 1)
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
@@ -125,6 +131,9 @@ def save_training_curves(history, strategy_name):
     plt.close()
     print(f"Saved: figures/{strategy_name}_training_curves.png")
 
+
+
+
 # Load models
 def build_resnet_s2():
     model = models.resnet18(weights=None)
@@ -135,9 +144,6 @@ def build_resnet_s3():
     model = models.resnet18(weights=None)
     model.fc = nn.Linear(model.fc.in_features, 7)
     return model
-
-
-
 
 print("\nLoading saved models...")
 model_eff_s3 = build_s3_gradual_unfreeze()
@@ -152,8 +158,7 @@ model_res_s3 = build_resnet_s3()
 model_res_s3.load_state_dict(torch.load('saved_models/resnet18_s3.pth', map_location=device))
 model_res_s3 = model_res_s3.to(device)
 
-print(" All models loaded!")
-
+print("All models loaded!")
 
 
 
@@ -174,8 +179,7 @@ save_confusion_matrix(model_res_s3, val_loader, "ResNet18_S3")
 
 
 
-
-# Training curves from saved history
+# Training curves
 print("\nGenerating training curves...")
 for name, path in [
     ("EfficientNet_S3", "saved_models/efficientnet_s3_history.pth"),
@@ -184,9 +188,5 @@ for name, path in [
 ]:
     history = torch.load(path, map_location='cpu')
     save_training_curves(history, name)
-
-
-
-
 
 print("\n All figures saved to figures/")
