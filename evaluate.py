@@ -7,14 +7,15 @@ import numpy as np
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
-from torchvision.models import ResNet18_Weights
 import torchvision.models as models
 from sklearn.metrics import balanced_accuracy_score, roc_auc_score, confusion_matrix, f1_score
 import matplotlib.pyplot as plt
 import seaborn as sns
 
 sys.path.insert(0, '.')
-from models.model import build_s3_gradual_unfreeze
+from models.model import build_s1_from_scratch, build_s2_full_freeze, build_s3_gradual_unfreeze
+
+
 
 # Device
 if torch.backends.mps.is_available():
@@ -22,7 +23,6 @@ if torch.backends.mps.is_available():
 else:
     device = torch.device("cpu")
 print("Using device:", device)
-
 
 
 
@@ -54,10 +54,7 @@ val_transforms = transforms.Compose([
 
 val_loader = DataLoader(SkinDataset(val_df, val_transforms), batch_size=32, shuffle=False)
 
-
 CLASS_NAMES = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
-
-
 
 def evaluate_model(model, loader, strategy_name):
     model.eval()
@@ -85,8 +82,6 @@ def evaluate_model(model, loader, strategy_name):
     print("=" * 40)
     return bal_acc, auc, macro_f1
 
-
-
 def save_confusion_matrix(model, loader, strategy_name):
     model.eval()
     all_preds, all_labels = [], []
@@ -111,8 +106,6 @@ def save_confusion_matrix(model, loader, strategy_name):
     plt.close()
     print(f"Saved: figures/{strategy_name}_confusion_matrix.png")
 
-
-
 def save_training_curves(history, strategy_name):
     epochs = range(1, len(history['train_loss']) + 1)
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
@@ -134,6 +127,7 @@ def save_training_curves(history, strategy_name):
 
 
 
+
 # Load models
 def build_resnet_s2():
     model = models.resnet18(weights=None)
@@ -146,6 +140,15 @@ def build_resnet_s3():
     return model
 
 print("\nLoading saved models...")
+
+model_eff_s1 = build_s1_from_scratch()
+model_eff_s1.load_state_dict(torch.load('saved_models/efficientnet_s1.pth', map_location=device))
+model_eff_s1 = model_eff_s1.to(device)
+
+model_eff_s2 = build_s2_full_freeze()
+model_eff_s2.load_state_dict(torch.load('saved_models/efficientnet_s2.pth', map_location=device))
+model_eff_s2 = model_eff_s2.to(device)
+
 model_eff_s3 = build_s3_gradual_unfreeze()
 model_eff_s3.load_state_dict(torch.load('saved_models/efficientnet_s3.pth', map_location=device))
 model_eff_s3 = model_eff_s3.to(device)
@@ -165,14 +168,23 @@ print("All models loaded!")
 
 # Evaluate all models
 print("\n" + "="*60)
+print("EfficientNet-B0 Results")
+print("="*60)
+evaluate_model(model_eff_s1, val_loader, "EfficientNet_S1")
+save_confusion_matrix(model_eff_s1, val_loader, "EfficientNet_S1")
+
+evaluate_model(model_eff_s2, val_loader, "EfficientNet_S2")
+save_confusion_matrix(model_eff_s2, val_loader, "EfficientNet_S2")
+
 evaluate_model(model_eff_s3, val_loader, "EfficientNet_S3")
 save_confusion_matrix(model_eff_s3, val_loader, "EfficientNet_S3")
 
 print("\n" + "="*60)
+print("ResNet18 Results")
+print("="*60)
 evaluate_model(model_res_s2, val_loader, "ResNet18_S2")
 save_confusion_matrix(model_res_s2, val_loader, "ResNet18_S2")
 
-print("\n" + "="*60)
 evaluate_model(model_res_s3, val_loader, "ResNet18_S3")
 save_confusion_matrix(model_res_s3, val_loader, "ResNet18_S3")
 
@@ -182,6 +194,8 @@ save_confusion_matrix(model_res_s3, val_loader, "ResNet18_S3")
 # Training curves
 print("\nGenerating training curves...")
 for name, path in [
+    ("EfficientNet_S1", "saved_models/efficientnet_s1_history.pth"),
+    ("EfficientNet_S2", "saved_models/efficientnet_s2_history.pth"),
     ("EfficientNet_S3", "saved_models/efficientnet_s3_history.pth"),
     ("ResNet18_S2",     "saved_models/resnet18_s2_history.pth"),
     ("ResNet18_S3",     "saved_models/resnet18_s3_history.pth"),
