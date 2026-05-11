@@ -1,0 +1,6 @@
+Strategy,Balanced_Accuracy,Macro_F1,Macro_AUC
+EfficientNet_S1,0.4998,0.3634,0.8775
+EfficientNet_S2,0.6183,0.4614,0.9122
+EfficientNet_S3,0.6553,0.4862,0.9242
+ResNet18_S2,0.5844,0.4232,0.8999
+ResNet18_S3,0.733,0.601,0.9451

@@ -204,3 +204,20 @@ for name, path in [
     save_training_curves(history, name)
 
 print("\n All figures saved to figures/")
+
+
+# Load test set
+test_df = pd.read_csv('preprocessed_output/test_split.csv')
+test_df['path'] = DATA_PATH + '/' + test_df['path'].str.replace('HAM10000/', '', regex=False)
+
+test_loader = DataLoader(SkinDataset(test_df, val_transforms), batch_size=32, shuffle=False)
+
+# Evaluate on test set
+print("\n" + "="*60)
+print("FINAL TEST SET EVALUATION")
+print("="*60)
+evaluate_model(model_eff_s1, test_loader, "Test_EfficientNet_S1")
+evaluate_model(model_eff_s2, test_loader, "Test_EfficientNet_S2")
+evaluate_model(model_eff_s3, test_loader, "Test_EfficientNet_S3")
+evaluate_model(model_res_s2, test_loader, "Test_ResNet18_S2")
+evaluate_model(model_res_s3, test_loader, "Test_ResNet18_S3")
