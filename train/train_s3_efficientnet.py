@@ -8,9 +8,10 @@ import numpy as np
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
-import torchvision.models as models
 from sklearn.utils.class_weight import compute_class_weight
-from sklearn.metrics import balanced_accuracy_score, roc_auc_score, f1_score
+
+sys.path.insert(0, '.')
+from models.model import build_s3_gradual_unfreeze, unfreeze_block
 
 # Device
 if torch.backends.mps.is_available():
@@ -24,7 +25,7 @@ else:
 
 
 
-# Data — change this path to your local dataset path
+# Data
 DATA_PATH = "/Users/daksahainichellappah/Desktop/Semester/Deepl Learning/DL_Project/dataset_Skin Cancer MNIST_HAM10000"
 
 train_df = pd.read_csv('preprocessed_output/train_split.csv')
@@ -33,12 +34,7 @@ val_df   = pd.read_csv('preprocessed_output/val_split.csv')
 train_df['path'] = DATA_PATH + '/' + train_df['path'].str.replace('HAM10000/', '', regex=False)
 val_df['path']   = DATA_PATH + '/' + val_df['path'].str.replace('HAM10000/', '', regex=False)
 
-print(f"Train: {len(train_df)} | Val: {len(val_df)}")
 
-
-
-
-# Dataset
 class SkinDataset(Dataset):
     def __init__(self, df, transform=None):
         self.df = df.reset_index(drop=True)
@@ -51,6 +47,8 @@ class SkinDataset(Dataset):
         if self.transform:
             image = self.transform(image)
         return image, label
+
+
 
 train_transforms = transforms.Compose([
     transforms.Resize((224, 224)),
@@ -74,8 +72,7 @@ class_weights = torch.FloatTensor(class_weights).to(device)
 
 
 
-
-# Training functions
+# Training
 def train_one_epoch(model, loader, optimizer, criterion):
     model.train()
     total_loss, correct, total = 0, 0, 0
@@ -94,56 +91,43 @@ def train_one_epoch(model, loader, optimizer, criterion):
 def validate(model, loader, criterion):
     model.eval()
     total_loss, correct, total = 0, 0, 0
-    all_preds, all_labels, all_probs = [], [], []
     with torch.no_grad():
         for images, labels in loader:
             images, labels = images.to(device), labels.to(device)
             outputs = model(images)
             loss = criterion(outputs, labels)
-            probs = torch.softmax(outputs, dim=1)
-            preds = outputs.argmax(dim=1)
             total_loss += loss.item()
-            correct += (preds == labels).sum().item()
+            correct += (outputs.argmax(dim=1) == labels).sum().item()
             total += labels.size(0)
-            all_preds.extend(preds.cpu().numpy())
-            all_labels.extend(labels.cpu().numpy())
-            all_probs.extend(probs.cpu().numpy())
-    return (total_loss / len(loader),
-            correct / total,
-            np.array(all_preds),
-            np.array(all_labels),
-            np.array(all_probs))
+    return total_loss / len(loader), correct / total
 
-
-
-
-# Build model
-def build_s2_full_freeze():
-    model = models.efficientnet_b0(weights='IMAGENET1K_V1')
-    for param in model.parameters():
-        param.requires_grad = False
-    model.classifier[1] = nn.Linear(model.classifier[1].in_features, 7)
-    print("EfficientNet S2 - Full Freeze: only classification head trainable")
-    return model
-
-model = build_s2_full_freeze()
+# Build and train model
+model = build_s3_gradual_unfreeze()
 model = model.to(device)
+
+
 
 criterion = nn.CrossEntropyLoss(weight=class_weights)
 optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-3)
 
-
-
 NUM_EPOCHS = 10
+UNFREEZE_EVERY = 3
 history = {'train_loss': [], 'val_loss': [], 'train_acc': [], 'val_acc': []}
 best_val_acc = 0
 
-print(f"\nTraining EfficientNet S2 for {NUM_EPOCHS} epochs...")
+print(f"\nTraining EfficientNet S3 for {NUM_EPOCHS} epochs...")
 print("=" * 60)
 
 for epoch in range(NUM_EPOCHS):
+    if epoch > 0 and epoch % UNFREEZE_EVERY == 0:
+        block_index = epoch // UNFREEZE_EVERY
+        total_blocks = len(list(model.features.children()))
+        if block_index < total_blocks:
+            unfreeze_block(model, block_index)
+            optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-4)
+
     train_loss, train_acc = train_one_epoch(model, train_loader, optimizer, criterion)
-    val_loss, val_acc, all_preds, all_labels, all_probs = validate(model, val_loader, criterion)
+    val_loss, val_acc     = validate(model, val_loader, criterion)
 
     history['train_loss'].append(train_loss)
     history['val_loss'].append(val_loss)
@@ -160,24 +144,8 @@ print(f"\nBest val accuracy: {best_val_acc:.4f}")
 
 
 
-# Final metrics
-bal_acc = balanced_accuracy_score(all_labels, all_preds)
-auc     = roc_auc_score(all_labels, all_probs, multi_class='ovr', average='macro')
-macro_f1 = f1_score(all_labels, all_preds, average='macro')
-
-print(f"\nFinal Results for EfficientNet S2:")
-print("=" * 40)
-print(f"Balanced Accuracy : {round(bal_acc, 4)}")
-print(f"Macro AUC         : {round(auc, 4)}")
-print(f"Macro F1          : {round(macro_f1, 4)}")
-print("=" * 40)
-
-
-
-
-
-# Save
+# Save model and history
 os.makedirs('saved_models', exist_ok=True)
-torch.save(model.state_dict(), 'saved_models/efficientnet_s2.pth')
-torch.save(history, 'saved_models/efficientnet_s2_history.pth')
-print(" Model saved to saved_models/efficientnet_s2.pth")
+torch.save(model.state_dict(), 'saved_models/efficientnet_s3.pth')
+torch.save(history, 'saved_models/efficientnet_s3_history.pth')
+print(" Model saved to saved_models/efficientnet_s3.pth")

@@ -1,3 +1,4 @@
+
 import os
 import sys
 import torch
@@ -8,10 +9,9 @@ import numpy as np
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
+from torchvision.models import ResNet18_Weights
+import torchvision.models as models
 from sklearn.utils.class_weight import compute_class_weight
-
-sys.path.insert(0, '.')
-from models.model import build_s3_gradual_unfreeze, unfreeze_block
 
 # Device
 if torch.backends.mps.is_available():
@@ -20,6 +20,7 @@ if torch.backends.mps.is_available():
 else:
     device = torch.device("cpu")
     print("Using CPU")
+
 
 
 
@@ -34,7 +35,6 @@ val_df   = pd.read_csv('preprocessed_output/val_split.csv')
 train_df['path'] = DATA_PATH + '/' + train_df['path'].str.replace('HAM10000/', '', regex=False)
 val_df['path']   = DATA_PATH + '/' + val_df['path'].str.replace('HAM10000/', '', regex=False)
 
-
 class SkinDataset(Dataset):
     def __init__(self, df, transform=None):
         self.df = df.reset_index(drop=True)
@@ -47,8 +47,6 @@ class SkinDataset(Dataset):
         if self.transform:
             image = self.transform(image)
         return image, label
-
-
 
 train_transforms = transforms.Compose([
     transforms.Resize((224, 224)),
@@ -72,7 +70,9 @@ class_weights = torch.FloatTensor(class_weights).to(device)
 
 
 
-# Training
+
+
+# Training functions
 def train_one_epoch(model, loader, optimizer, criterion):
     model.train()
     total_loss, correct, total = 0, 0, 0
@@ -101,11 +101,29 @@ def validate(model, loader, criterion):
             total += labels.size(0)
     return total_loss / len(loader), correct / total
 
-# Build and train model
-model = build_s3_gradual_unfreeze()
+def unfreeze_resnet_block(model, block_index):
+    blocks = ['layer1', 'layer2', 'layer3', 'layer4']
+    if block_index < len(blocks):
+        block = getattr(model, blocks[block_index])
+        for param in block.parameters():
+            param.requires_grad = True
+        print(f"ResNet {blocks[block_index]} unfrozen")
+
+
+
+
+
+# Build model
+def build_resnet_s3():
+    model = models.resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
+    for param in model.parameters():
+        param.requires_grad = False
+    model.fc = nn.Linear(model.fc.in_features, 7)
+    print("ResNet18 S3 - Gradual Unfreeze: starts frozen")
+    return model
+
+model = build_resnet_s3()
 model = model.to(device)
-
-
 
 criterion = nn.CrossEntropyLoss(weight=class_weights)
 optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-3)
@@ -115,16 +133,14 @@ UNFREEZE_EVERY = 3
 history = {'train_loss': [], 'val_loss': [], 'train_acc': [], 'val_acc': []}
 best_val_acc = 0
 
-print(f"\nTraining EfficientNet S3 for {NUM_EPOCHS} epochs...")
+print(f"\nTraining ResNet18 S3 for {NUM_EPOCHS} epochs...")
 print("=" * 60)
 
 for epoch in range(NUM_EPOCHS):
     if epoch > 0 and epoch % UNFREEZE_EVERY == 0:
-        block_index = epoch // UNFREEZE_EVERY
-        total_blocks = len(list(model.features.children()))
-        if block_index < total_blocks:
-            unfreeze_block(model, block_index)
-            optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-4)
+        block_index = epoch // UNFREEZE_EVERY - 1
+        unfreeze_resnet_block(model, block_index)
+        optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-4)
 
     train_loss, train_acc = train_one_epoch(model, train_loader, optimizer, criterion)
     val_loss, val_acc     = validate(model, val_loader, criterion)
@@ -144,8 +160,9 @@ print(f"\nBest val accuracy: {best_val_acc:.4f}")
 
 
 
-# Save model and history
+
+# Save
 os.makedirs('saved_models', exist_ok=True)
-torch.save(model.state_dict(), 'saved_models/efficientnet_s3.pth')
-torch.save(history, 'saved_models/efficientnet_s3_history.pth')
-print(" Model saved to saved_models/efficientnet_s3.pth")
+torch.save(model.state_dict(), 'saved_models/resnet18_s3.pth')
+torch.save(history, 'saved_models/resnet18_s3_history.pth')
+print(" Model saved to saved_models/resnet18_s3.pth")
